@@ -1,18 +1,12 @@
 import torch
-import clip
-from CLIP_prepare_config import generate_captions_and_embeddings_from_config
+from clip_prepare_config import generate_captions_and_embeddings_from_config
 from CLIPImageReaderDataset import CLIPImageReaderDataset
+from .utils import load_clip_model
 
 
 def get_single_image_probabilities(image_path, config_path, model_version, device):
-    # load the CLIP model
-    if device == "cpu":
-        device = torch.device("cpu")
-    else:
-        device = torch.device(f"cuda:{device}")
-
-    model, preprocess = clip.load(model_version, device=device)
-    model.eval()
+    # load the model
+    model, processor = load_clip_model(model_version, device)
 
     # get the config defined captions
     all_captions, idx_to_caption, caption_to_emb, cfg = (
@@ -49,6 +43,3 @@ def get_single_image_probabilities(image_path, config_path, model_version, devic
     }
 
     return caption_to_prob, cfg
-    # caption_to_prob = dict(sorted(caption_to_prob.items(), key=lambda item: -item[1]))
-    # most_probable5 = list(caption_to_prob.items())[:5]
-    # cpas = [(cap, prob, cfg.extract_attributes(cap)) for (cap,prob) in most_probable5]

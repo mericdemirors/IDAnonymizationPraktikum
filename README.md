@@ -1,4 +1,5 @@
 # IDAnonymizationPraktikum
 
 # TODO
-1- create a CLIP utility that takes a single image and returns a dict of captions each matching to their respective probability
+1- Tidy up the CLIP and DDIM sections, write comments etc
+2- prepare dummy main.py file

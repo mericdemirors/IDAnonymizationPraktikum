@@ -1,24 +1,12 @@
 import torch
-import clip
 import argparse
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from CLIP_prepare_config import generate_captions_and_embeddings_from_config
+from clip_prepare_config import generate_captions_and_embeddings_from_config
 from CLIPImageReaderDataset import CLIPImageReaderDataset
 
 
-def get_image_dataset_captions_and_attributes(
-    config_path, dataset_path, model_version, device
-):
-    # load the CLIP model
-    if device == "cpu":
-        device = torch.device("cpu")
-    else:
-        device = torch.device(f"cuda:{device}")
-
-    model, preprocess = clip.load(model_version, device=device)
-    model.eval()
-
+def get_image_dataset_captions_and_attributes(config_path, dataset_path, model, device):
     # get the config defined captions
     all_captions, idx_to_caption, caption_to_emb, cfg = (
         generate_captions_and_embeddings_from_config(config_path, model, device)
