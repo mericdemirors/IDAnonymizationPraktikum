@@ -10,12 +10,12 @@ attributes_and_values_dict = {
 empty_caption = "A portrait photo of a {age} year old {race} {gender}."
 
 
-def fill_attributes(selected_values_dict):
+def fill_attributes(selected_values_dict: dict):
     """Fills the template using the dictionary keys"""
     return empty_caption.format(**selected_values_dict)
 
 
-def extract_attributes(caption):
+def extract_attributes(caption: str):
     """Regex pattern to capture the values based on the known template structure"""
     pattern = (
         r"A portrait photo of a (?P<age>\d+) year old (?P<race>\w+) (?P<gender>\w+)."

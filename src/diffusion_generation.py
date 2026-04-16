@@ -1,46 +1,53 @@
-# diffusion_generation.py
 import torch
+from tqdm import tqdm
 
-def diffusion_step(latent, condition, is_positive=True):
-    """
-    Single step of the UNet predicting the noise residual.
-    """
-    # Placeholder: UNet forward pass
-    # prediction = unet(latent, condition)
-    prediction = torch.randn_like(latent) # Mock prediction
-    return prediction
+from diffusion_section.diffusion_single_step import *
 
-def image_generation_loop(starting_noise, c1_condition, new_id_condition, num_steps=50):
+
+# function to generate image from noise by positive and negative parallel diffusions
+def parallel_generate(
+    negative_model,
+    positive_model,
+    scheduler,
+    negative_condition,
+    positive_condition,
+    n_coeff,
+    p_coeff,
+    n_coeff_update_fn,
+    p_coeff_update_fn,
+    num_inference_steps=50,
+    guidance_scale=7.5,
+    latent_shape=(1, 4, 64, 64),
+    device="cuda",
+):
     """
-    The dual-path diffusion generation process.
+    does positive and negative parallel diffusions
     """
-    latent = starting_noise
-    
-    for i in range(num_steps):
-        # *** Footnote scheduling: 
-        # Start with high λn, low λp and end with low λn, high λp.
-        # Maybe even below zero λn towards the end.
-        progress = i / num_steps
-        lambda_n = 1.0 - progress       # Decays from 1 to 0 (or below)
-        lambda_p = progress             # Grows from 0 to 1
-        
-        # Red Path: Negative prediction conditioned on C1
-        neg_prediction = diffusion_step(latent, c1_condition, is_positive=False)
-        
-        # Green/Blue Path: Positive prediction conditioned on New ID
-        pos_prediction = diffusion_step(latent, new_id_condition, is_positive=True)
-        
-        # Merge predictions: Ti = λn*Neg + λp*Pos
-        merged_prediction = (lambda_n * neg_prediction) + (lambda_p * pos_prediction)
-        
-        # Placeholder: Step the scheduler forward using the merged prediction
-        # latent = scheduler.step(merged_prediction, i, latent).prev_sample
-        latent = latent - (0.01 * merged_prediction) # Mock step
-        
-    print("Diffusion process complete. T0 = Final Image achieved.")
-    
-    # Placeholder: Decode latent to final image
-    # final_image = vae.decode(latent)
-    final_image = "final_anonymized_image.jpg"
-    
-    return final_image
+    latent = torch.randn(latent_shape, device=device)
+
+    scheduler.set_timesteps(num_inference_steps)
+
+    for t in tqdm(scheduler.timesteps):
+        neg_latent_step = take_diffusion_step(
+            model=negative_model,
+            latent=latent,
+            timestep=t,
+            scheduler=scheduler,
+            conditioning=negative_condition,
+            guidance_scale=guidance_scale,
+        )
+
+        pos_latent_step = take_diffusion_step(
+            model=positive_model,
+            latent=latent,
+            timestep=t,
+            scheduler=scheduler,
+            conditioning=positive_condition,
+            guidance_scale=guidance_scale,
+        )
+
+        latent = (n_coeff * neg_latent_step) + (p_coeff * pos_latent_step)
+        n_coeff = n_coeff_update_fn(n_coeff, t)
+        p_coeff = p_coeff_update_fn(p_coeff, t)
+
+    return latent

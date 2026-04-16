@@ -14,7 +14,7 @@ from torchvision.transforms import (
 
 
 class CLIPImageReaderDataset(Dataset):
-    def __init__(self, dataset_folder=None):
+    def __init__(self, dataset_folder: str = None):
         # image pre-processing to fit the CLIP input expectations
         self.transform = Compose(
             [
@@ -58,12 +58,12 @@ class CLIPImageReaderDataset(Dataset):
     def __len__(self):
         return len(self.images)
 
-    def read_single_img(self, img_full_path):
+    def read_single_img(self, img_full_path: str):
         img = Image.open(img_full_path)
         img = self.transform(img)
         return img
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
         img_full_path = self.images[idx]
 
         id_folder, img_file_name = os.path.split(img_full_path)

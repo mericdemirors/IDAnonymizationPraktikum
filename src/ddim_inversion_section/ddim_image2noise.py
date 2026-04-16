@@ -2,18 +2,15 @@ import torch
 from .utils import *
 
 
+# function to reverse image into ddim noise with no condition
 def ddim_nocond_inversion(
-    image_path: str,
+    pipe,
+    scheduler,
+    latents,
     device: str,
-    model_version: str,
     num_inference_steps: int,
 ):
-    # get pipe, embed image, embed uncond prompt
-    pipe, scheduler = prepare_pipe_and_scheduler(
-        model_version, device, num_inference_steps
-    )
-    image_tensor = read_and_prepare_image(image_path, device)
-    latents = embed_image_latent(pipe, image_tensor)
+    # embed image, embed uncond prompt
     text_embeddings = embed_prompt(pipe, "", device)
 
     for i, t in enumerate(reversed(scheduler.timesteps)):
@@ -33,20 +30,17 @@ def ddim_nocond_inversion(
     return latents
 
 
+# function to reverse image into DDIM noise with condition
 def ddim_cond_inversion(
-    image_path: str,
+    pipe,
+    scheduler,
+    latents,
     device: str,
-    model_version: str,
     num_inference_steps: str,
     prompt: int,
     guidance_scale: float,
 ):
-    # get pipe, embed image, embed uncond and cond prompt, merge text embeds
-    pipe, scheduler = prepare_pipe_and_scheduler(
-        model_version, device, num_inference_steps
-    )
-    image_tensor = read_and_prepare_image(image_path, device)
-    latents = embed_image_latent(pipe, image_tensor)
+    # embed image, embed uncond and cond prompt, merge text embeds
     cond_embeddings = embed_prompt(pipe, prompt, device)
     uncond_embeddings = embed_prompt(pipe, "", device)
     text_embeddings = torch.cat([uncond_embeddings, cond_embeddings], dim=0)
