@@ -1,12 +1,14 @@
+import os
 import torch
 import argparse
+import pickle
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from caption_retrieval_section.clip_configs.clip_prepare_config import (
+from clip_configs.clip_prepare_config import (
     generate_captions_and_embeddings_from_config,
 )
 from CLIPImageReaderDataset import CLIPImageReaderDataset
-from .utils import load_clip_model
+from utils import load_clip_model
 
 
 # function to get image-caption matchings to prepare the RAG dataset
@@ -37,18 +39,13 @@ def get_image_dataset_captions_and_attributes(config_path, dataset_path, model, 
         with torch.no_grad():
             image_embeds = model.encode_image(imgs).float()
             image_embeds /= image_embeds.norm(dim=-1, keepdim=True)
-
             probs = (100.0 * image_embeds @ all_text_embeds.T).softmax(dim=-1)
-
-            # get the index of most probable match
             best_match_indices = torch.argmax(probs, dim=1).cpu().tolist()
 
         # map images to their caption probability, caption str, and list of attributes
         for i, match_idx in enumerate(best_match_indices):
-            caption_prob = probs[best_match_indices].item()
-
+            caption_prob = probs[i, match_idx].item()
             caption_text = idx_to_caption[match_idx]
-
             attributes_dict = cfg.extract_attributes(caption_text)
 
             # Build the key using the current batch element
@@ -66,9 +63,8 @@ def get_image_dataset_captions_and_attributes(config_path, dataset_path, model, 
 
 
 if __name__ == "__main__":
-    # 1. Get Arguments
     parser = argparse.ArgumentParser(
-        description="Process dataset with CLIP and dynamic config."
+        description="Process dataset and save Top-10 mapping."
     )
     parser.add_argument(
         "--config_path", type=str, required=True, help="Path to CLIP attributes config"
@@ -76,6 +72,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset_path", type=str, required=True, help="Path to the dataset folder"
     )
+    parser.add_argument("--output_pickle", type=str, default="caption_to_images.pkl")
     parser.add_argument(
         "--model_version", type=str, default="ViT-L/14", help="CLIP model version"
     )
@@ -83,9 +80,29 @@ if __name__ == "__main__":
         "--device", type=str, default="cpu", help="GPU ID (int) or 'cpu'"
     )
     args = parser.parse_args()
+    device = f"cuda:{args.device}" if args.device.isdigit() else "cpu"
 
-    model, processor = load_clip_model(args.model_version, args.device)
+    # get image to caption mapping
+    model, processor = load_clip_model(args.model_version, device)
     image_to_caption_and_attributes = get_image_dataset_captions_and_attributes(
-        args.config_path, args.dataset_path, model, args.device
+        args.config_path, args.dataset_path, model, device
     )
-    print("image_to_caption_and_attributes", image_to_caption_and_attributes)
+
+    # create caption to image mapping
+    caption_to_all_matches = {}
+
+    for img_path, (prob, caption, _) in image_to_caption_and_attributes.items():
+        if caption not in caption_to_all_matches:
+            caption_to_all_matches[caption] = []
+        caption_to_all_matches[caption].append((img_path, prob))
+
+    # get top 10 matches
+    caption_to_top10_match_and_probs_dict = {}
+    for caption, matches in caption_to_all_matches.items():
+        sorted_matches = sorted(matches, key=lambda x: x[1], reverse=True)
+        caption_to_top10_match_and_probs_dict[caption] = sorted_matches[:10]
+
+    # save
+    parent_dir = os.path.dirname(os.path.abspath(args.dataset_path))
+    with open(os.path.join(parent_dir, args.output_pickle), "wb") as f:
+        pickle.dump(caption_to_top10_match_and_probs_dict, f)

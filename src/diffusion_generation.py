@@ -8,6 +8,7 @@ from diffusion_section.diffusion_single_step import *
 def parallel_generate(
     negative_model,
     positive_model,
+    latent,
     scheduler,
     negative_condition,
     positive_condition,
@@ -17,13 +18,10 @@ def parallel_generate(
     p_coeff_update_fn,
     num_inference_steps=50,
     guidance_scale=7.5,
-    latent_shape=(1, 4, 64, 64),
-    device="cuda",
 ):
     """
     does positive and negative parallel diffusions
     """
-    latent = torch.randn(latent_shape, device=device)
 
     scheduler.set_timesteps(num_inference_steps)
 
