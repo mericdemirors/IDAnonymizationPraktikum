@@ -69,6 +69,6 @@ class CLIPImageReaderDataset(Dataset):
         id_folder, img_file_name = os.path.split(img_full_path)
         id_idx = os.path.split(id_folder)[1]
 
-        img = self.read_single_img(img_full_path)
+        img = self.read_single_img(img_full_path=img_full_path)
 
         return id_idx, img_file_name, img

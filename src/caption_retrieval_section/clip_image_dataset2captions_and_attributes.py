@@ -4,18 +4,20 @@ import argparse
 import pickle
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from clip_configs.clip_prepare_config import (
+from .clip_configs.clip_prepare_config import (
     generate_captions_and_embeddings_from_config,
 )
-from CLIPImageReaderDataset import CLIPImageReaderDataset
-from utils import load_clip_model
+from .CLIPImageReaderDataset import CLIPImageReaderDataset
+from .utils import load_clip_model
 
 
 # function to get image-caption matchings to prepare the RAG dataset
 def get_image_dataset_captions_and_attributes(config_path, dataset_path, model, device):
     # get the config defined captions
     all_captions, idx_to_caption, caption_to_emb, cfg = (
-        generate_captions_and_embeddings_from_config(config_path, model, device)
+        generate_captions_and_embeddings_from_config(
+            config_file_path=config_path, model=model, device=device
+        )
     )
 
     # create the matrix that holds caption embeddings
@@ -26,7 +28,7 @@ def get_image_dataset_captions_and_attributes(config_path, dataset_path, model, 
     all_text_embeds /= all_text_embeds.norm(dim=-1, keepdim=True)
 
     # setup the dataset
-    dataset = CLIPImageReaderDataset(dataset_path)
+    dataset = CLIPImageReaderDataset(dataset_folder=dataset_path)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     # '<id>/<sample>' -> (caption_text, dict_of_attributes)
@@ -46,7 +48,7 @@ def get_image_dataset_captions_and_attributes(config_path, dataset_path, model, 
         for i, match_idx in enumerate(best_match_indices):
             caption_prob = probs[i, match_idx].item()
             caption_text = idx_to_caption[match_idx]
-            attributes_dict = cfg.extract_attributes(caption_text)
+            attributes_dict = cfg.extract_attributes(caption=caption_text)
 
             # Build the key using the current batch element
             # Assuming id_indices and img_file_names are lists from the dataloader
@@ -83,9 +85,12 @@ if __name__ == "__main__":
     device = f"cuda:{args.device}" if args.device.isdigit() else "cpu"
 
     # get image to caption mapping
-    model, processor = load_clip_model(args.model_version, device)
+    model, processor = load_clip_model(model_version=args.model_version, device=device)
     image_to_caption_and_attributes = get_image_dataset_captions_and_attributes(
-        args.config_path, args.dataset_path, model, device
+        config_path=args.config_path,
+        dataset_path=args.dataset_path,
+        model=model,
+        device=device,
     )
 
     # create caption to image mapping

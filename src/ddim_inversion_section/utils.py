@@ -4,9 +4,9 @@ from torchvision import transforms
 from diffusers import StableDiffusionPipeline, DDIMScheduler
 
 
-def prepare_pipe_and_scheduler(model_version, device, num_inference_steps):
+def prepare_pipe_and_scheduler(model_version, device, num_inference_steps=150):
     pipe = StableDiffusionPipeline.from_pretrained(
-        model_version, torch_dtype=torch.float16 if device == "cuda" else torch.float32
+        model_version, torch_dtype=torch.float32
     ).to(device)
 
     scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
@@ -29,32 +29,26 @@ def read_and_prepare_image(image_path, device):
     return image_tensor
 
 
-def embed_image_latent(pipe, image_tensor):
-    with torch.no_grad():
-        latents = pipe.vae.encode(image_tensor).latent_dist.sample()
-        latents = latents * pipe.vae.config.scaling_factor
+def embed_image_latent(pipeline_bundle, image_tensor):
+    image_tensor = image_tensor.to(dtype=pipeline_bundle["dtype"])
+
+    latents = pipeline_bundle["vae"].encode(image_tensor).latent_dist.sample()
+    latents = latents * pipeline_bundle["vae"].config.scaling_factor
+    latents = latents.to(dtype=pipeline_bundle["dtype"])
     return latents
 
 
-def embed_prompt(pipe, prompt, device):
-    text_input = pipe.tokenizer(
-        [prompt],
-        padding="max_length",
-        max_length=pipe.tokenizer.model_max_length,
-        return_tensors="pt",
-    )
-    text_embeddings = pipe.text_encoder(text_input.input_ids.to(device))[0]
-    return text_embeddings
-
-
-def inversion_step(latents, scheduler, t, num_inference_steps, i, device, noise_pred):
-    alpha_t = scheduler.alphas_cumprod[t]
+def inversion_step(pipeline_bundle, latents, t, num_inference_steps, i, noise_pred):
+    alpha_t = pipeline_bundle["scheduler"].alphas_cumprod[t]
     alpha_prev = (
-        scheduler.alphas_cumprod[scheduler.timesteps[-i - 2]]
+        pipeline_bundle["scheduler"].alphas_cumprod[
+            pipeline_bundle["scheduler"].timesteps[-i - 2]
+        ]
         if i < num_inference_steps - 1
-        else torch.tensor(1.0, device=device)
+        else pipeline_bundle["scheduler"].alphas_cumprod[-1]
     )
 
     latents = (latents - (1 - alpha_t).sqrt() * noise_pred) / alpha_t.sqrt()
     latents = alpha_prev.sqrt() * latents + (1 - alpha_prev).sqrt() * noise_pred
+    latents = latents.to(dtype=pipeline_bundle["dtype"])
     return latents

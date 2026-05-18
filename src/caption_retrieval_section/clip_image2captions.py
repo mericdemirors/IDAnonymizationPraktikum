@@ -1,15 +1,17 @@
 import torch
-from caption_retrieval_section.clip_configs.clip_prepare_config import (
+from .clip_configs.clip_prepare_config import (
     generate_captions_and_embeddings_from_config,
 )
-from CLIPImageReaderDataset import CLIPImageReaderDataset
+from .CLIPImageReaderDataset import CLIPImageReaderDataset
 
 
 # function to get attribute probs of a single image
 def get_single_image_probabilities(image_path, config_path, model, device):
     # get the config defined captions
     all_captions, idx_to_caption, caption_to_emb, cfg = (
-        generate_captions_and_embeddings_from_config(config_path, model, device)
+        generate_captions_and_embeddings_from_config(
+            config_file_path=config_path, model=model, device=device
+        )
     )
 
     # create the matrix that holds caption embeddings

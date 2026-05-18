@@ -29,4 +29,4 @@ def create_all_possible_captions():
     keys = attributes_and_values_dict.keys()
     values = attributes_and_values_dict.values()
     combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
-    return sorted([fill_attributes(c) for c in combinations])
+    return sorted([fill_attributes(selected_values_dict=c) for c in combinations])

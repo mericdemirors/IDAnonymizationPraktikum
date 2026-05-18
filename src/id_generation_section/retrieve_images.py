@@ -1,6 +1,7 @@
 import torch
 import cv2
 import numpy as np
+from src.helper_functions import embed_prompt
 
 
 def retrieve_images_with_text(dataset_dict: dict, text_prompt: str, n: int):
@@ -10,62 +11,43 @@ def retrieve_images_with_text(dataset_dict: dict, text_prompt: str, n: int):
     return [img for img in images if img is not None]
 
 
-def generate_image_with_text(
-    model,
-    scheduler,
-    vae,
-    text_encoder,
-    tokenizer,
-    text_prompt,
-    num_steps=50,
-    guidance_scale=7.5,
+def generate_single_image_with_text(
+    pipeline_bundle, text_prompt, num_inference_steps=150, guidance_scale=7.5
 ):
     """
     Standard implementation of a text-to-image diffusion loop.
     """
-    device = next(model.parameters()).device
-
     # 1. Encode the text prompt
-    text_inputs = tokenizer(
-        text_prompt,
-        return_tensors="pt",
-        padding="max_length",
-        max_length=tokenizer.model_max_length,
-        truncation=True,
-    ).to(device)
-    prompt_embeds = text_encoder(text_inputs.input_ids)[0]
+    prompt_embeds = embed_prompt(pipeline_bundle, text_prompt)
 
     # 2. Encode unconditional empty string for CFG
-    uncond_inputs = tokenizer(
-        "",
-        return_tensors="pt",
-        padding="max_length",
-        max_length=tokenizer.model_max_length,
-        truncation=True,
-    ).to(device)
-    negative_prompt_embeds = text_encoder(uncond_inputs.input_ids)[0]
+    negative_prompt_embeds = embed_prompt(pipeline_bundle, "")
 
     # Concatenate for batch processing (uncond first, then cond)
     context = torch.cat([negative_prompt_embeds, prompt_embeds])
 
     # Initialize latents
-    latents = torch.randn((1, 4, 64, 64), device=device)
+    latents = torch.randn((1, 4, 64, 64), device=pipeline_bundle["device"])
 
     # Set timesteps
-    scheduler.set_timesteps(num_steps)
-    latents = latents * scheduler.init_noise_sigma
+    pipeline_bundle["scheduler"].set_timesteps(num_inference_steps)
+    latents = latents * pipeline_bundle["scheduler"].init_noise_sigma
+
+    latents = latents.to(dtype=pipeline_bundle["dtype"])
+    context = context.to(dtype=pipeline_bundle["dtype"])
 
     # Denoising Loop
-    for t in scheduler.timesteps:
+    for t in pipeline_bundle["scheduler"].timesteps:
         # Expand latents for Classifier-Free Guidance
         latent_model_input = torch.cat([latents] * 2)
-        latent_model_input = scheduler.scale_model_input(latent_model_input, t)
+        latent_model_input = pipeline_bundle["scheduler"].scale_model_input(
+            latent_model_input, t
+        )
 
         # Predict noise residual
-        with torch.no_grad():
-            noise_pred = model(
-                latent_model_input, t, encoder_hidden_states=context
-            ).sample
+        noise_pred = pipeline_bundle["unet"](
+            latent_model_input, t, encoder_hidden_states=context
+        ).sample
 
         # Perform Guidance
         noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
@@ -74,28 +56,28 @@ def generate_image_with_text(
         )
 
         # Compute previous noisy sample (x_t -> x_t-1)
-        latents = scheduler.step(noise_pred, t, latents).prev_sample
+        latents = pipeline_bundle["scheduler"].step(noise_pred, t, latents).prev_sample
 
     # 6. Decode Latents
     latents = 1 / 0.18215 * latents
-    with torch.no_grad():
-        image = vae.decode(latents).sample
+    image = pipeline_bundle["vae"].decode(latents).sample
 
     # Post-process to [0, 1] range
     image = (image / 2 + 0.5).clamp(0, 1)
     return image
 
 
-def generate_images_with_text(pipeline_bundle, text_prompt, n=1, **kwargs):
-    """
-    Generates n images. pipeline_bundle contains (model, scheduler, vae, etc.)
-    Returns a list of BGR numpy images.
-    """
+def generate_images_with_text(
+    pipeline_bundle, text_prompt, num_inference_steps, guidance_scale, n
+):
     generated_images = []
     for _ in range(n):
         # Using your existing logic but wrapped
-        image_tensor = generate_image_with_text(
-            **pipeline_bundle, text_prompt=text_prompt, **kwargs
+        image_tensor = generate_single_image_with_text(
+            pipeline_bundle=pipeline_bundle,
+            text_prompt=text_prompt,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale,
         )
 
         # Convert Tensor [1, 3, H, W] -> BGR Numpy [H, W, 3]
