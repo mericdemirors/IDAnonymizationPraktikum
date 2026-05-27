@@ -43,9 +43,9 @@ def get_id_from_textual_data(
         f"got {len(images)} images using {method}, extracted {len(id_embeddings)} ID embeddings (RIGHT NOW FACES ARE NOT BEING ALIGNED BEFORE ID EMBED EXTRACT)"
     )
 
-    # if no ID found in the images, return None
+    # if no ID found in the images
     if id_embeddings.shape[0] == 0:
-        return None
+        return torch.zeros(512, dtype=torch.float32).to(pipeline_bundle["device"])
 
     # else aggregate the IDs into a single ID
     final_id = id_aggregation_func(id_embeddings)

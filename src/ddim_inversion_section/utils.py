@@ -1,19 +1,50 @@
 import torch
 from PIL import Image
 from torchvision import transforms
-from diffusers import StableDiffusionPipeline, DDIMScheduler
+from diffusers import StableDiffusionPipeline, DDIMScheduler, AutoencoderKL
 
 
-def prepare_pipe_and_scheduler(model_version, device, num_inference_steps=150):
+def prepare_only_from_pipe(model_version, device):
     pipe = StableDiffusionPipeline.from_pretrained(
         model_version, torch_dtype=torch.float32
-    ).to(device)
+    )
 
     scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
     pipe.scheduler = scheduler
-    scheduler.set_timesteps(num_inference_steps)
 
-    return pipe, scheduler
+    pipe = pipe.to(device)
+
+    return pipe
+
+
+def prepare_pipe_and_scheduler(model_version, vae_model_version, device):
+    if vae_model_version is None:
+        return prepare_only_from_pipe(model_version=model_version, device=device)
+
+    vae = AutoencoderKL.from_pretrained(vae_model_version).to(
+        device=device, dtype=torch.float32
+    )
+
+    scheduler = DDIMScheduler(
+        num_train_timesteps=1000,
+        beta_start=0.00085,
+        beta_end=0.012,
+        beta_schedule="scaled_linear",
+        clip_sample=False,
+        set_alpha_to_one=False,
+        steps_offset=1,
+    )
+
+    pipe = StableDiffusionPipeline.from_pretrained(
+        model_version,
+        torch_dtype=torch.float32,
+        scheduler=scheduler,
+        vae=vae,
+        feature_extractor=None,
+        safety_checker=None,
+    ).to(device)
+
+    return pipe
 
 
 def read_and_prepare_image(image_path, device):

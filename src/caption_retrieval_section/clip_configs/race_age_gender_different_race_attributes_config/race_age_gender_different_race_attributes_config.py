@@ -34,5 +34,9 @@ def create_all_possible_captions():
 
 def get_positive_and_negative_captions(captions_probs_attributelist):
     negative_caption = captions_probs_attributelist[0][0]
-    positive_caption = captions_probs_attributelist[1][0]
+    negative_race = captions_probs_attributelist[0][2]["race"]
+    for i in range(1, len(captions_probs_attributelist)):
+        if negative_race != captions_probs_attributelist[i][2]["race"]:
+            positive_caption = captions_probs_attributelist[i][0]
+            break
     return negative_caption, positive_caption

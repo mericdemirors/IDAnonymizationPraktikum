@@ -3,11 +3,9 @@ from .caption_retrieval_section.clip_image2captions import (
 )
 
 
-def get_image_captions(image_path, config_path, model, device):
-    """
-    Returns C1 (Best matching) and C2 (Second best matching) caption texts.
-    * Footnote: Instead of second match text, we can go with lower rank ones or multiple texts.
-    """
+def get_image_captions_and_pos_neg_caption_retrieval_fn(
+    image_path, config_path, model, device
+):
     caption_to_prob, cfg = get_single_image_probabilities(
         image_path=image_path, config_path=config_path, model=model, device=device
     )
@@ -17,4 +15,4 @@ def get_image_captions(image_path, config_path, model, device):
         for (cap, prob) in list(caption_to_prob.items())
     ]
 
-    return captions_probs_attributelist
+    return captions_probs_attributelist, cfg.get_positive_and_negative_captions

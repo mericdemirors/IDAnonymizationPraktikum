@@ -1,1 +1,5 @@
 **/__pycache__/
+exp*/**
+datasets/**
+src/face-rec/**
+src/ip_adapter_section/**

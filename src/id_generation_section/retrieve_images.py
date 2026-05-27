@@ -1,4 +1,5 @@
 import torch
+from tqdm import tqdm
 import cv2
 import numpy as np
 from src.helper_functions import embed_prompt
@@ -71,7 +72,7 @@ def generate_images_with_text(
     pipeline_bundle, text_prompt, num_inference_steps, guidance_scale, n
 ):
     generated_images = []
-    for _ in range(n):
+    for _ in tqdm(range(n)):
         # Using your existing logic but wrapped
         image_tensor = generate_single_image_with_text(
             pipeline_bundle=pipeline_bundle,
