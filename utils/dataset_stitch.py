@@ -104,8 +104,8 @@ def stitch_image_grid(dataset_path, F, I, S, output_name="stitched_grid.png"):
 # --- Execution block ---
 if __name__ == "__main__":
     # Path exactly matching your environment setup
-    DATASET_PATH = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/single_id_different_race_anon_dataset"
-    OUT_NAME = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/single_id_different_race_anon_dataset_stitched.png"
+    DATASET_PATH = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/parallel_text_p15_different_race_anon_dataset"
+    OUT_NAME = f"{DATASET_PATH}_stitched.png"
 
     # Adjust your grid parameters here
     stitch_image_grid(

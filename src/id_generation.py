@@ -10,8 +10,6 @@ def get_id_from_textual_data(
     face_app,
     pipeline_bundle,
     dataset_dict=None,
-    num_inference_steps=150,
-    guidance_scale=7.5,
 ):
     """
     Main entry point to get a single ID embedding from text.
@@ -27,11 +25,7 @@ def get_id_from_textual_data(
         if pipeline_bundle is None:
             raise ValueError("pipeline_bundle is required for Generation method")
         images = generate_images_with_text(
-            pipeline_bundle=pipeline_bundle,
-            text_prompt=text_prompt,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=guidance_scale,
-            n=number_of_ids,
+            pipeline_bundle=pipeline_bundle, text_prompt=text_prompt, n=number_of_ids
         )
     else:
         raise ValueError("Method must be 'RAG' or 'Generation'")

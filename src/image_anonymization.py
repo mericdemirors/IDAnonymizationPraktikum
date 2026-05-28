@@ -1,11 +1,12 @@
 import os
+import pickle
 import torch
 from insightface.app import FaceAnalysis
 
 from .caption_retrieval import get_image_captions_and_pos_neg_caption_retrieval_fn
 from .caption_retrieval_section.utils import load_clip_model
 from .ddim_inversion import ddim_invert_image
-from .ddim_inversion_section.utils import prepare_pipe_and_scheduler
+from .ddim_inversion_section.utils import prepare_pipe
 from .diffusion_generation import (
     parallel_text_generate,
     single_text_generate,
@@ -51,8 +52,8 @@ def run_image_swap_pipeline(
     image_save_path,
     inversion_num_inference_steps,
     inversion_guidance_scale,
-    generation_num_inference_steps,
-    generation_guidance_scale,
+    text_generation_num_inference_steps,
+    text_generation_guidance_scale,
     ip_adapter_num_inference_steps,
     ip_adapter_guidance_scale,
     generation_method,
@@ -77,10 +78,11 @@ def run_image_swap_pipeline(
         )
         CLIP_MODEL = clip_model
     if pipeline_bundle is None:
-        pipe = prepare_pipe_and_scheduler(
+        pipe = prepare_pipe(
             model_version=pipe_version, vae_model_version=vae_version, device=device
         )
         pipeline_bundle = {
+            "pipe": pipe,
             "unet": pipe.unet,
             "scheduler": pipe.scheduler,
             "vae": pipe.vae,
@@ -98,8 +100,15 @@ def run_image_swap_pipeline(
         )
         FACE_APP = face_app
     if ip_adapter_model is None and "id" in generation_method:
+        # we have to create a new pipeline becuase ip adapter modifies the one we pass
+        # we want to have the pipeline_bundle untouched because it's used everywhere
+        pipe_for_ipadapter = prepare_pipe(
+            model_version=pipe_version, vae_model_version=vae_version, device=device
+        )
         ip_adapter_model = prepare_ip_adapter(
-            pipe=pipe, ip_ckpt=ip_adapter_ckpt, device=pipeline_bundle["device"]
+            pipe=pipe_for_ipadapter,
+            ip_ckpt=ip_adapter_ckpt,
+            device=pipeline_bundle["device"],
         )
         IP_ADAPTER_MODEL = ip_adapter_model
     # GET MODELS  GET MODELS # GET MODELS # GET MODELS # GET MODELS #
@@ -150,8 +159,6 @@ def run_image_swap_pipeline(
             face_app=face_app,
             pipeline_bundle=pipeline_bundle,
             dataset_dict=dataset_dict,
-            num_inference_steps=generation_num_inference_steps,
-            guidance_scale=generation_guidance_scale,
         )
         if identity_embedding.sum() == 0:
             print("ABORT")
@@ -167,8 +174,8 @@ def run_image_swap_pipeline(
                 pipeline_bundle=pipeline_bundle,
                 latent=ddim_inverted_latent.clone(),
                 positive_condition=positive_caption,
-                num_inference_steps=generation_num_inference_steps,
-                guidance_scale=generation_guidance_scale,
+                num_inference_steps=text_generation_num_inference_steps,
+                guidance_scale=text_generation_guidance_scale,
             )
             decode_latent_to_image_and_save(latent, pipeline_bundle, image_save_path)
         case "parallel_text":
@@ -181,8 +188,8 @@ def run_image_swap_pipeline(
                 p_coeff=p_coeff_init,
                 n_coeff_update_fn=n_coeff_update_fn,
                 p_coeff_update_fn=p_coeff_update_fn,
-                num_inference_steps=generation_num_inference_steps,
-                guidance_scale=generation_guidance_scale,
+                num_inference_steps=text_generation_num_inference_steps,
+                guidance_scale=text_generation_guidance_scale,
             )
             decode_latent_to_image_and_save(latent, pipeline_bundle, image_save_path)
         case "single_id":
@@ -215,67 +222,70 @@ def run_image_swap_pipeline(
 """
 single_text parameters:
 
-pipe_version="runwayml/stable-diffusion-v1-5",
-vae_version=None,
-inversion_num_inference_steps=100,
-inversion_guidance_scale=1.25,
-generation_num_inference_steps=150,
-generation_guidance_scale=5.5,
+    pipe_version="runwayml/stable-diffusion-v1-5",
+    vae_version=None,
+    inversion_num_inference_steps=100,
+    inversion_guidance_scale=1.25,
+    text_generation_num_inference_steps=150,
+    text_generation_guidance_scale=5.5,
 
-OR
+    OR
 
-pipe_version="SG161222/Realistic_Vision_V4.0_noVAE",
-vae_version="stabilityai/sd-vae-ft-mse",
-inversion_num_inference_steps=50,
-inversion_guidance_scale=1.25,
-generation_num_inference_steps=100,
-generation_guidance_scale=3,
+    pipe_version="SG161222/Realistic_Vision_V4.0_noVAE",
+    vae_version="stabilityai/sd-vae-ft-mse",
+    inversion_num_inference_steps=50,
+    inversion_guidance_scale=1.25,
+    text_generation_num_inference_steps=100,
+    text_generation_guidance_scale=3,
 
-
-
+    
 
 parallel_text_parameters:
 
-pipe_version="runwayml/stable-diffusion-v1-5",
-vae_version=None,
-inversion_num_inference_steps=100,
-inversion_guidance_scale=1.25,
-generation_num_inference_steps=150,
-generation_guidance_scale=5.5,
+    pipe_version="runwayml/stable-diffusion-v1-5",
+    vae_version=None,
+    inversion_num_inference_steps=100,
+    inversion_guidance_scale=1.25,
+    text_generation_num_inference_steps=150,
+    text_generation_guidance_scale=5.5,
 
-OR
+    OR
 
-pipe_version="SG161222/Realistic_Vision_V4.0_noVAE",
-vae_version="stabilityai/sd-vae-ft-mse",
-inversion_num_inference_steps=50, or 100
-inversion_guidance_scale=1.25,
-generation_num_inference_steps=100, or 50
-generation_guidance_scale=3, or 5.5
-
-
+    pipe_version="SG161222/Realistic_Vision_V4.0_noVAE",
+    vae_version="stabilityai/sd-vae-ft-mse",
+    inversion_num_inference_steps=50, or 100
+    inversion_guidance_scale=1.25,
+    text_generation_num_inference_steps=100, or 50
+    text_generation_guidance_scale=3, or 5.5
 
 
 
 single_id_parameters:
 
-pipe_version="runwayml/stable-diffusion-v1-5",
-vae_version=None,
-DOESN'T WORK
+    pipe_version="runwayml/stable-diffusion-v1-5",
+    vae_version=None,
+    DOESN'T WORK
 
-OR
+    OR
 
-STILL DOESN'T WORK, BUT AT LEAST GIVES OKAY RESULTS
-pipe_version="SG161222/Realistic_Vision_V4.0_noVAE",
-vae_version="stabilityai/sd-vae-ft-mse",
-inversion_num_inference_steps=50
-inversion_guidance_scale=1.25,
-ip_adapter_num_inference_steps=50,
-ip_adapter_guidance_scale=5.5,
+    STILL DOESN'T WORK, BUT AT LEAST GIVES OKAY RESULTS
+    pipe_version="SG161222/Realistic_Vision_V4.0_noVAE",
+    vae_version="stabilityai/sd-vae-ft-mse",
+    inversion_num_inference_steps=50
+    inversion_guidance_scale=1.25,
+    ip_adapter_num_inference_steps=50,
+    ip_adapter_guidance_scale=5.5,
 
 """
 
 
 if __name__ == "__main__":
+    with open(
+        "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/caption_to_images.pkl",
+        "rb",
+    ) as f:
+        dataset_dict = pickle.load(f)
+
     GPU_ID = 0
     with torch.no_grad():
         image_save_path = f"tries/stable_diffusion_output.png"
@@ -294,13 +304,7 @@ if __name__ == "__main__":
             ip_adapter_height=512,
             # how to retrieve a new ID
             new_id_retrieval_method="RAG",
-            dataset_dict={  # DUMMY DICT TO SPEED UP IPadapter TESTS AND ENSURE WE GET ID EMBEDDING EVERY TIME
-                "A portrait photo of a 35 year old Indian Female.": [
-                    "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/anon_toy_dataset/4/0.png",
-                    "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/anon_toy_dataset/4/3.png",
-                    "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/anon_toy_dataset/4/4.png",
-                ]
-            },
+            dataset_dict="/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/caption_to_images.pkl",
             # parallel generation coefficients
             n_coeff_init=0,
             p_coeff_init=1,
@@ -314,8 +318,8 @@ if __name__ == "__main__":
             inversion_num_inference_steps=100,
             inversion_guidance_scale=1.25,
             # how to generate new image
-            generation_num_inference_steps=150,
-            generation_guidance_scale=5.5,
+            text_generation_num_inference_steps=150,
+            text_generation_guidance_scale=5.5,
             ip_adapter_num_inference_steps=50,
             ip_adapter_guidance_scale=5.5,
             # what generation type to apply

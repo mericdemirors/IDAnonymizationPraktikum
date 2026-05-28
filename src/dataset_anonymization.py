@@ -1,11 +1,9 @@
 import os
+import pickle
 from tqdm import tqdm
 import torch
-from insightface.app import FaceAnalysis
 
 from .image_anonymization import run_image_swap_pipeline
-from .caption_retrieval_section.utils import load_clip_model
-from .ddim_inversion_section.utils import prepare_pipe_and_scheduler
 
 
 def prepare_dataset(dataset_path, new_dataset_path):
@@ -37,8 +35,14 @@ def prepare_dataset(dataset_path, new_dataset_path):
 
 if __name__ == "__main__":
     dataset_path = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/toy_dataset"
-    new_dataset_path = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/single_id_different_race_anon_dataset"
+    new_dataset_path = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/parallel_text_p15_different_race_anon_dataset"
     image_list = prepare_dataset(dataset_path, new_dataset_path)
+
+    with open(
+        "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/caption_to_images.pkl",
+        "rb",
+    ) as f:
+        dataset_dict = pickle.load(f)
 
     GPU_ID = 0
     for image_path, image_save_path in tqdm(image_list):
@@ -63,31 +67,25 @@ if __name__ == "__main__":
                 ip_adapter_width=512,
                 ip_adapter_height=512,
                 new_id_retrieval_method="generation",
-                dataset_dict={
-                    "A portrait photo of a 35 year old Indian Female.": [
-                        "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/anon_toy_dataset/4/0.png",
-                        "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/anon_toy_dataset/4/3.png",
-                        "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/anon_toy_dataset/4/4.png",
-                    ]
-                },
+                dataset_dict=dataset_dict,
                 number_of_ids=3,
                 # this part used for ID conditioning together with IP ADAPTER
                 #
                 #
                 # this part used for parallel generation
-                n_coeff_init=0,
-                p_coeff_init=1,
+                n_coeff_init=-0.5,
+                p_coeff_init=1.5,
                 n_coeff_update_fn=lambda c, t: c,
                 p_coeff_update_fn=lambda c, t: c,
                 # this part used for parallel generation
                 #
                 #
-                # how to ddim inverse the image
+                # diff step parameters
                 inversion_num_inference_steps=50,
                 inversion_guidance_scale=1.25,
-                generation_num_inference_steps=150,  # only for text generation
-                generation_guidance_scale=5.5,  # only for text generation
-                ip_adapter_num_inference_steps=50,  # only for ID generation
-                ip_adapter_guidance_scale=5.5,  # only for ID generation
-                generation_method="single_id",
+                text_generation_num_inference_steps=100,
+                text_generation_guidance_scale=3,
+                ip_adapter_num_inference_steps=50,
+                ip_adapter_guidance_scale=5.5,
+                generation_method="parallel_text",
             )

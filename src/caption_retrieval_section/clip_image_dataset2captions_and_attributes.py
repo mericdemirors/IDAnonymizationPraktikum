@@ -83,6 +83,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     device = f"cuda:{args.device}" if args.device.isdigit() else "cpu"
+    parent_dir = os.path.dirname(os.path.abspath(args.dataset_path))
 
     # get image to caption mapping
     model, processor = load_clip_model(model_version=args.model_version, device=device)
@@ -99,7 +100,9 @@ if __name__ == "__main__":
     for img_path, (prob, caption, _) in image_to_caption_and_attributes.items():
         if caption not in caption_to_all_matches:
             caption_to_all_matches[caption] = []
-        caption_to_all_matches[caption].append((img_path, prob))
+        caption_to_all_matches[caption].append(
+            (os.path.join(parent_dir, img_path), prob)
+        )
 
     # get top 10 matches
     caption_to_top10_match_and_probs_dict = {}
@@ -108,6 +111,5 @@ if __name__ == "__main__":
         caption_to_top10_match_and_probs_dict[caption] = sorted_matches[:10]
 
     # save
-    parent_dir = os.path.dirname(os.path.abspath(args.dataset_path))
     with open(os.path.join(parent_dir, args.output_pickle), "wb") as f:
         pickle.dump(caption_to_top10_match_and_probs_dict, f)

@@ -21,7 +21,11 @@ def embed_prompt(pipeline_bundle, prompt):
 def decode_latent_to_image_and_save(latent, pipeline_bundle, image_save_path):
     decoded_latent = (
         pipeline_bundle["vae"]
-        .decode((latent / 0.18215).to(pipeline_bundle["dtype"]))
+        .decode(
+            (latent / pipeline_bundle["vae"].config.scaling_factor).to(
+                pipeline_bundle["dtype"]
+            )
+        )
         .sample
     )
     image = pipeline_bundle["image_processor"].postprocess(

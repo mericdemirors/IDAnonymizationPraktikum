@@ -4,47 +4,22 @@ from torchvision import transforms
 from diffusers import StableDiffusionPipeline, DDIMScheduler, AutoencoderKL
 
 
-def prepare_only_from_pipe(model_version, device):
-    pipe = StableDiffusionPipeline.from_pretrained(
-        model_version, torch_dtype=torch.float32
-    )
-
-    scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
-    pipe.scheduler = scheduler
-
-    pipe = pipe.to(device)
-
-    return pipe
-
-
-def prepare_pipe_and_scheduler(model_version, vae_model_version, device):
-    if vae_model_version is None:
-        return prepare_only_from_pipe(model_version=model_version, device=device)
-
-    vae = AutoencoderKL.from_pretrained(vae_model_version).to(
-        device=device, dtype=torch.float32
-    )
-
-    scheduler = DDIMScheduler(
-        num_train_timesteps=1000,
-        beta_start=0.00085,
-        beta_end=0.012,
-        beta_schedule="scaled_linear",
-        clip_sample=False,
-        set_alpha_to_one=False,
-        steps_offset=1,
-    )
-
-    pipe = StableDiffusionPipeline.from_pretrained(
-        model_version,
-        torch_dtype=torch.float32,
-        scheduler=scheduler,
-        vae=vae,
-        feature_extractor=None,
-        safety_checker=None,
-    ).to(device)
-
-    return pipe
+def prepare_pipe(model_version, vae_model_version, device):
+    if vae_model_version:
+        vae = AutoencoderKL.from_pretrained(
+            vae_model_version, torch_dtype=torch.float32
+        )
+        pipe = StableDiffusionPipeline.from_pretrained(
+            model_version, vae=vae, torch_dtype=torch.float32
+        )
+    else:
+        pipe = StableDiffusionPipeline.from_pretrained(
+            model_version, torch_dtype=torch.float32
+        )
+    pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
+    pipe.safety_checker = None
+    pipe.feature_extractor = None
+    return pipe.to(device)
 
 
 def read_and_prepare_image(image_path, device):
