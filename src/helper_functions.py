@@ -2,20 +2,25 @@ def verbose(text, **kwargs):
     print(f"\033[32m{text}\033[0m", **kwargs)
 
 
-def embed_prompt(pipeline_bundle, prompt):
-    text_input = pipeline_bundle["tokenizer"](
-        [prompt],
-        padding="max_length",
-        max_length=pipeline_bundle["tokenizer"].model_max_length,
-        return_tensors="pt",
-    )
-    text_embeddings = pipeline_bundle["text_encoder"](
-        text_input.input_ids.to(pipeline_bundle["device"])
+def embed_prompt(
+    pipeline_bundle_or_ipadapter, prompt, do_classifier_free_guidance=False
+):
+    if isinstance(pipeline_bundle_or_ipadapter, dict):
+        pipe = pipeline_bundle_or_ipadapter["pipe"]
+        device = pipeline_bundle_or_ipadapter["device"]
+    else:
+        pipe = pipeline_bundle_or_ipadapter.pipe
+        device = pipeline_bundle_or_ipadapter.device
+
+    prompt_embeds = pipe.encode_prompt(
+        prompt=prompt,
+        device=device,
+        num_images_per_prompt=1,
+        do_classifier_free_guidance=do_classifier_free_guidance,
+        negative_prompt=None,
     )[0]
 
-    text_embeddings = text_embeddings.to(dtype=pipeline_bundle["dtype"])
-
-    return text_embeddings
+    return prompt_embeds
 
 
 def decode_latent_to_image_and_save(latent, pipeline_bundle, image_save_path):

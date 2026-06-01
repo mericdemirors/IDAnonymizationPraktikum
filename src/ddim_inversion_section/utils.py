@@ -35,26 +35,32 @@ def read_and_prepare_image(image_path, device):
     return image_tensor
 
 
-def embed_image_latent(pipeline_bundle, image_tensor):
-    image_tensor = image_tensor.to(dtype=pipeline_bundle["dtype"])
+def embed_image_latent(pipeline_bundle_or_ipadapter, image_tensor):
+    if isinstance(pipeline_bundle_or_ipadapter, dict):
+        vae = pipeline_bundle_or_ipadapter["vae"]
+        device = pipeline_bundle_or_ipadapter["device"]
+        dtype = pipeline_bundle_or_ipadapter["dtype"]
+    else:
+        vae = pipeline_bundle_or_ipadapter.pipe.vae
+        device = pipeline_bundle_or_ipadapter.device
+        dtype = image_tensor.dtype
 
-    latents = pipeline_bundle["vae"].encode(image_tensor).latent_dist.sample()
-    latents = latents * pipeline_bundle["vae"].config.scaling_factor
-    latents = latents.to(dtype=pipeline_bundle["dtype"])
+    image_tensor = image_tensor.to(device=device, dtype=dtype)
+    latents = vae.encode(image_tensor).latent_dist.sample()
+    latents = latents * vae.config.scaling_factor
+    latents = latents.to(device=device, dtype=dtype)
+
     return latents
 
 
-def inversion_step(pipeline_bundle, latents, t, num_inference_steps, i, noise_pred):
-    alpha_t = pipeline_bundle["scheduler"].alphas_cumprod[t]
+def inversion_step(scheduler, latents, t, num_inference_steps, i, noise_pred):
+    alpha_t = scheduler.alphas_cumprod[t]
     alpha_prev = (
-        pipeline_bundle["scheduler"].alphas_cumprod[
-            pipeline_bundle["scheduler"].timesteps[-i - 2]
-        ]
+        scheduler.alphas_cumprod[scheduler.timesteps[-i - 2]]
         if i < num_inference_steps - 1
-        else pipeline_bundle["scheduler"].alphas_cumprod[-1]
+        else scheduler.alphas_cumprod[-1]
     )
 
     latents = (latents - (1 - alpha_t).sqrt() * noise_pred) / alpha_t.sqrt()
     latents = alpha_prev.sqrt() * latents + (1 - alpha_prev).sqrt() * noise_pred
-    latents = latents.to(dtype=pipeline_bundle["dtype"])
     return latents

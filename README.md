@@ -1,6 +1,5 @@
 # IDAnonymizationPraktikum  
 
-- maybe I need to do the DDIM inversion with the IPAdapter model itself to match the latent noise space  
 - parallel_id_generation  
 - controlnet implementation  
 - evaluation metric implementation  

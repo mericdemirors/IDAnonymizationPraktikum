@@ -39,7 +39,7 @@ def prepare_dataset(dataset_path, new_dataset_path):
 
 
 if __name__ == "__main__":
-    generation_method = "single_id"
+    generation_method = "parallel_text"
     dataset_folder = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/FFHQ_toy_dataset_folder"
     dataset_name = "FFHQ_5_img"
     dataset_path = os.path.join(dataset_folder, dataset_name)
@@ -80,8 +80,8 @@ if __name__ == "__main__":
                 #
                 #
                 # this part used for parallel generation
-                n_coeff_init=-3,
-                p_coeff_init=4,
+                n_coeff_init=-1,
+                p_coeff_init=2,
                 n_coeff_update_fn=lambda c, t: c,
                 p_coeff_update_fn=lambda c, t: c,
                 # this part used for parallel generation

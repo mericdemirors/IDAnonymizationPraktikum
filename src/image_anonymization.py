@@ -139,8 +139,10 @@ def run_image_swap_pipeline(
     #
     # PREPARE DDIM LATENT # PREPARE DDIM LATENT # PREPARE DDIM LATENT #
     ddim_inverted_latent = ddim_invert_image(
+        generation_method=generation_method,
         image_path=image_path,
         pipeline_bundle=pipeline_bundle,
+        ip_adapter_model=ip_adapter_model,
         prompt=negative_caption,
         num_inference_steps=inversion_num_inference_steps,
         guidance_scale=inversion_guidance_scale,
