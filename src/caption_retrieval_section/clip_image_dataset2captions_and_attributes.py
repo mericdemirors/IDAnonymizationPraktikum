@@ -54,7 +54,7 @@ def get_image_dataset_captions_and_attributes(config_path, dataset_path, model, 
             # Assuming id_indices and img_file_names are lists from the dataloader
             curr_id = id_indices[i]
             curr_name = img_file_names[i]
-            key = f"{curr_id}/{curr_name}"
+            key = os.path.join(f"{curr_id}", f"{curr_name}")
             image_to_caption_and_attributes[key] = (
                 caption_prob,
                 caption_text,

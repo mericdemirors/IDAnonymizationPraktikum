@@ -41,10 +41,6 @@ def parallel_text_generate(
     num_inference_steps=150,
     guidance_scale=7.5,
 ):
-    """
-    does positive and negative parallel diffusions
-    """
-
     pipeline_bundle["scheduler"].set_timesteps(num_inference_steps)
 
     for t in tqdm(pipeline_bundle["scheduler"].timesteps):

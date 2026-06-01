@@ -9,39 +9,46 @@ from .image_anonymization import run_image_swap_pipeline
 def prepare_dataset(dataset_path, new_dataset_path):
     os.makedirs(new_dataset_path, exist_ok=True)
 
-    fldr_list = sorted(
-        [fldr for fldr in os.listdir(dataset_path) if (fldr != ".DS_Store")],
-        key=lambda fldr: int(fldr),
-    )
+    all_items = [f for f in os.listdir(dataset_path) if f != ".DS_Store"]
+    image_list = []
 
-    for fldr in fldr_list:
-        os.makedirs(os.path.join(new_dataset_path, fldr), exist_ok=True)
+    if any(
+        os.path.isdir(os.path.join(dataset_path, f)) for f in all_items
+    ):  # folder dataset with folders inside
+        fldr_list = sorted(all_items, key=lambda f: int(f))
 
-    os.makedirs(new_dataset_path, exist_ok=True)
-    image_list = [
-        (
-            os.path.join(dataset_path, fldr, file),
-            os.path.join(new_dataset_path, fldr, file),
-        )
-        for fldr in fldr_list
-        for file in sorted(
-            os.listdir(os.path.join(dataset_path, fldr)),
-            key=lambda file: int(file.split(".")[0]),
-        )
-    ]
+        for fldr in fldr_list:
+            source_fldr = os.path.join(dataset_path, fldr)
+            target_fldr = os.path.join(new_dataset_path, fldr)
+            os.makedirs(target_fldr, exist_ok=True)
+
+            # Process files within each subfolder
+            files = sorted(os.listdir(source_fldr), key=lambda f: int(f.split(".")[0]))
+            for file in files:
+                image_list.append(
+                    (os.path.join(source_fldr, file), os.path.join(target_fldr, file))
+                )
+    else:  # one folder dataset with images inside
+        files = sorted(all_items, key=lambda f: int(f.split(".")[0]))
+        for file in files:
+            image_list.append(
+                (os.path.join(dataset_path, file), os.path.join(new_dataset_path, file))
+            )
 
     return image_list
 
 
 if __name__ == "__main__":
-    dataset_path = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/toy_dataset"
-    new_dataset_path = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/parallel_text_p15_different_race_anon_dataset"
+    generation_method = "single_id"
+    dataset_folder = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/FFHQ_toy_dataset_folder"
+    dataset_name = "FFHQ_5_img"
+    dataset_path = os.path.join(dataset_folder, dataset_name)
+    new_dataset_path = os.path.join(
+        dataset_folder, f"{dataset_name}_{generation_method}"
+    )
     image_list = prepare_dataset(dataset_path, new_dataset_path)
 
-    with open(
-        "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/caption_to_images.pkl",
-        "rb",
-    ) as f:
+    with open(os.path.join(dataset_folder, "caption_to_images.pkl"), "rb") as f:
         dataset_dict = pickle.load(f)
 
     GPU_ID = 0
@@ -73,8 +80,8 @@ if __name__ == "__main__":
                 #
                 #
                 # this part used for parallel generation
-                n_coeff_init=-0.5,
-                p_coeff_init=1.5,
+                n_coeff_init=-3,
+                p_coeff_init=4,
                 n_coeff_update_fn=lambda c, t: c,
                 p_coeff_update_fn=lambda c, t: c,
                 # this part used for parallel generation
@@ -87,5 +94,5 @@ if __name__ == "__main__":
                 text_generation_guidance_scale=3,
                 ip_adapter_num_inference_steps=50,
                 ip_adapter_guidance_scale=5.5,
-                generation_method="parallel_text",
+                generation_method=generation_method,
             )

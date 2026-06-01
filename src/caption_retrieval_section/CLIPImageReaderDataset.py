@@ -35,25 +35,39 @@ class CLIPImageReaderDataset(Dataset):
         if dataset_folder is None:
             return
 
-        # get ID folders
-        fldr_list = sorted(
-            [fldr for fldr in os.listdir(dataset_folder) if not fldr.startswith(".")],
-            key=lambda fldr: int(fldr),
-        )
-
         # get images under the ID folders
         self.images = []
+        self.is_nested = False
         valid_exts = (".jpg", ".jpeg", ".png")
-        for fldr in tqdm(fldr_list):
-            fldr_path = os.path.join(dataset_folder, fldr)
 
-            files = sorted(
-                [f for f in os.listdir(fldr_path) if f.lower().endswith(valid_exts)],
-                key=lambda f: int(f.split(".")[0]),
+        all_items = [f for f in os.listdir(dataset_folder) if not f.startswith(".")]
+        self.is_nested = any(
+            os.path.isdir(os.path.join(dataset_folder, f)) for f in all_items
+        )
+
+        if self.is_nested:
+            fldr_list = sorted(all_items, key=lambda f: int(f))
+            for fldr in tqdm(fldr_list):
+                fldr_path = os.path.join(dataset_folder, fldr)
+                files = sorted(
+                    [
+                        f
+                        for f in os.listdir(fldr_path)
+                        if f.lower().endswith(valid_exts)
+                    ],
+                    key=lambda f: int(f.split(".")[0]),
+                )
+                for file in files:
+                    self.images.append(os.path.join(fldr_path, file))
+        else:
+            self.images = sorted(
+                [
+                    os.path.join(dataset_folder, f)
+                    for f in os.listdir(dataset_folder)
+                    if f.lower().endswith(valid_exts)
+                ],
+                key=lambda f: int(os.path.basename(f).split(".")[0]),
             )
-
-            for file in files:
-                self.images.append(os.path.join(fldr_path, file))
 
     def __len__(self):
         return len(self.images)
@@ -65,10 +79,13 @@ class CLIPImageReaderDataset(Dataset):
 
     def __getitem__(self, idx: int):
         img_full_path = self.images[idx]
-
-        id_folder, img_file_name = os.path.split(img_full_path)
-        id_idx = os.path.split(id_folder)[1]
-
         img = self.read_single_img(img_full_path=img_full_path)
+        img_file_name = os.path.basename(img_full_path)
+
+        # if dataset is not a folder dataset we return empty id
+        if self.is_nested:
+            id_idx = os.path.basename(os.path.dirname(img_full_path))
+        else:
+            id_idx = ""
 
         return id_idx, img_file_name, img

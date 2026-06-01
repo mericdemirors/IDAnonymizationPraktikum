@@ -3,7 +3,15 @@ from PIL import Image
 from tqdm import tqdm
 
 
-def create_image_grids(source_folder, output_folder, grid_size=5, img_w=64, img_h=64):
+def create_image_grids(
+    source_folder,
+    output_folder,
+    sort_by_size,
+    row_count=5,
+    column_count=5,
+    img_w=64,
+    img_h=64,
+):
     # Ensure output directory exists
     os.makedirs(output_folder, exist_ok=True)
 
@@ -11,11 +19,14 @@ def create_image_grids(source_folder, output_folder, grid_size=5, img_w=64, img_
     valid_extensions = (".jpg", ".jpeg", ".png")
 
     # Get all valid image paths from the source folder
-    image_paths = [
-        os.path.join(source_folder, f)
-        for f in os.listdir(source_folder)
-        if f.lower().endswith(valid_extensions)
-    ]
+    image_paths = sorted(
+        [
+            os.path.join(source_folder, f)
+            for f in os.listdir(source_folder)
+            if f.lower().endswith(valid_extensions)
+        ],
+        key=lambda f: int(os.path.basename(f).split(".")[0]),
+    )
 
     if not image_paths:
         print(f"No valid images found in '{source_folder}'.")
@@ -23,14 +34,15 @@ def create_image_grids(source_folder, output_folder, grid_size=5, img_w=64, img_
 
     print(f"Found {len(image_paths)} images. Processing grids...")
 
-    image_paths.sort(key=os.path.getsize, reverse=False)
+    if sort_by_size:
+        image_paths.sort(key=os.path.getsize, reverse=False)
 
     # Calculate total images needed per grid (5x5 = 25)
-    imgs_per_grid = grid_size * grid_size
+    imgs_per_grid = row_count * column_count
 
     # Calculate the pixel dimensions of the final stitched canvas
-    grid_pixel_width = grid_size * img_w
-    grid_pixel_height = grid_size * img_h
+    grid_pixel_height = row_count * img_h
+    grid_pixel_width = column_count * img_w
 
     grid_count = 0
 
@@ -53,12 +65,12 @@ def create_image_grids(source_folder, output_folder, grid_size=5, img_w=64, img_
                     img_resized = img.resize((img_w, img_h))
 
                     # Calculate X and Y grid coordinates (0 to 4)
-                    col = index % grid_size
-                    row = index // grid_size
+                    row_i = index // column_count
+                    col_i = index % column_count
 
                     # Calculate actual pixel position
-                    x_pos = col * img_w
-                    y_pos = row * img_h
+                    x_pos = col_i * img_w
+                    y_pos = row_i * img_h
 
                     # Paste the image onto the canvas
                     grid_image.paste(img_resized, (x_pos, y_pos))
@@ -75,9 +87,19 @@ def create_image_grids(source_folder, output_folder, grid_size=5, img_w=64, img_
 
 
 # --- Configuration ---
-SOURCE_DIR = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/tries"
-OUTPUT_DIR = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/grids"
+SOURCE_DIR = "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/FFHQ_toy_dataset_folder/FFHQ_5_img_single_id"
+OUTPUT_DIR = (
+    "/igd/a1/home/demiroer/IDAnonymizationPraktikum/datasets/FFHQ_toy_dataset_folder"
+)
 
 # Run the function
 if __name__ == "__main__":
-    create_image_grids(SOURCE_DIR, OUTPUT_DIR)
+    create_image_grids(
+        SOURCE_DIR,
+        OUTPUT_DIR,
+        sort_by_size=False,
+        row_count=2,
+        column_count=3,
+        img_w=256,
+        img_h=256,
+    )
